@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/dist/css/main.css" />
+    <title>WebCrypto Signal Protocol</title>
+  </head>
+  <body class="dark:bg-gray-950 dark:text-white">
+    <h1 class="text-3xl text-center mb-16">WebCrypto Signal Protocol</h1>
+
+    <div class="grid grid-cols-2 gap-2 px-2 mb-16">
+      <div><h2 class="text-2xl text-center">Alice</h2></div>
+      <div><h2 class="text-2xl text-center">Bob</h2></div>
+    </div>
+    <div class="text-left mx-auto max-w-prose mb-16">
+      Alice and Bob each begin by creating a "prekey bundle", which contains
+      their long-term identity key, a signed prekey, and a set of one-time-use
+      prekeys. The public halves of each of these keys are shared with the
+      server and with other users.
+    </div>
+    <div class="grid grid-cols-2 gap-2 px-2 mb-16">
+      <div>
+        <pre
+          class="bg-gray-100 dark:bg-gray-900 overflow-auto max-h-64 rounded"
+        ><code id="alice-prekey-bundle"></code></pre>
+      </div>
+      <div>
+        <pre
+          class="bg-gray-100 dark:bg-gray-900 overflow-auto max-h-64 rounded"
+        ><code id="bob-prekey-bundle"></code></pre>
+      </div>
+    </div>
+    <div class="text-left mx-auto max-w-prose mb-16">
+      When Alice wants to send a message to Bob, she finds him on the server and
+      downloads part of his prekey bundle. (She only downloads a single
+      one-time-use prekey) Her first step is to validate the signature of Bob's
+      signed prekey, to prove that it was signed by Bob's identity key.
+    </div>
+    <div class="grid grid-cols-2 gap-2 px-2 mb-16">
+      <div>
+        <div class="flex flex-col gap-2">
+          <div>
+            <button
+              class="bg-violet-600 text-white py-2 px-4 rounded"
+              onclick="actions.aliceFetchBob()"
+            >
+              1. Fetch Bob's prekey bundle
+            </button>
+            <span id="status-fetch-bob-prekey"></span>
+          </div>
+          <div>
+            <pre
+              class="bg-gray-100 dark:bg-gray-900 overflow-auto max-h-64 rounded"
+            ><code id="fetch-bob-prekey-bundle"></code></pre>
+          </div>
+          <div>
+            <button
+              class="bg-violet-600 text-white py-2 px-4 rounded"
+              onclick="actions.aliceValidateBob()"
+            >
+              2. Validate Bob's signed prekey
+            </button>
+            <span id="status-validate-bob-prekey"></span>
+          </div>
+          <div>
+            <pre
+              class="bg-gray-100 dark:bg-gray-900 overflow-auto max-h-64 rounded"
+            ><code id="validate-bob-prekey-bundle"></code></pre>
+          </div>
+        </div>
+      </div>
+      <div></div>
+    </div>
+    <div class="text-left mx-auto max-w-prose mb-16">
+      Now that Alice has proven that Bob signed the signed prekey with his
+      private identity key, she can safely begin the key exchange process using
+      <a
+        href="https://www.signal.org/docs/specifications/x3dh/#sending-the-initial-message"
+        target="_blank"
+        >X3DH</a
+      >
+    </div>
+    <div class="grid grid-cols-2 gap-2 px-2 mb-16">
+      <div>
+        <div>
+          <button
+            class="bg-violet-600 text-white py-2 px-4 rounded"
+            onclick="actions.aliceDHCalculations()"
+          >
+            Calculate Diffie-Hellman keys
+          </button>
+        </div>
+        <div>
+          <pre
+            class="bg-gray-100 dark:bg-gray-900 overflow-auto max-h-64 rounded"
+          ><code id="alice-generate-sk"></code></pre>
+        </div>
+      </div>
+      <div></div>
+    </div>
+
+    <script type="module" src="/dist/js/main.js"></script>
+  </body>
+</html>

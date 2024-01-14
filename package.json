@@ -1,0 +1,20 @@
+{
+  "name": "webcrypto-signal-protocol",
+  "version": "1.0.0",
+  "description": "An experiment to learn about the Signal Protocol by implementing it using WebCrypto APIs",
+  "main": "index.js",
+  "scripts": {
+    "serve": "serve .",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "watch": "esbuild --bundle src/js/main.ts --outdir=dist/js --watch=forever & tailwindcss -i src/css/main.css -o dist/css/main.css --watch=forever"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "esbuild": "^0.19.11",
+    "serve": "^14.2.1",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.3.3"
+  }
+}
