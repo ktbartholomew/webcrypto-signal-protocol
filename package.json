@@ -4,6 +4,7 @@
   "description": "An experiment to learn about the Signal Protocol by implementing it using WebCrypto APIs",
   "main": "index.js",
   "scripts": {
+    "build": "esbuild --bundle src/js/main.ts --outdir=dist/js && tailwindcss -i src/css/main.css -o dist/css/main.css",
     "serve": "serve .",
     "test": "echo \"Error: no test specified\" && exit 1",
     "watch": "esbuild --bundle src/js/main.ts --outdir=dist/js --watch=forever & tailwindcss -i src/css/main.css -o dist/css/main.css --watch=forever"
