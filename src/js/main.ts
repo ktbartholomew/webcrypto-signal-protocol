@@ -47,14 +47,11 @@ async function aliceFetchBob(e: Event) {
   if (el) {
     el.innerHTML = JSON.stringify(
       {
-        identitySigningKey: bufferToBase64(
+        identityKey: bufferToBase64(
           await crypto.subtle.exportKey(
             "raw",
             bobPrekeyBundle.identitySigningKey
           )
-        ),
-        identityDHKey: bufferToBase64(
-          await crypto.subtle.exportKey("raw", bobPrekeyBundle.identityDHKey)
         ),
         signedPrekey: bufferToBase64(
           await crypto.subtle.exportKey("raw", bobPrekeyBundle.signedPrekey)
@@ -92,6 +89,10 @@ async function aliceValidateBob(e: Event) {
 }
 
 async function aliceDHCalculations(e: Event) {
+  if (!bobPrekeyBundle) {
+    await aliceFetchBob(e);
+  }
+
   const alice = identities["alice"];
   const bob = bobPrekeyBundle;
 
@@ -152,7 +153,9 @@ async function aliceDHCalculations(e: Event) {
 
   const el = document.getElementById("alice-generate-sk");
   if (el) {
-    el.innerHTML = JSON.stringify(
+    const skString = bufferToBase64(await crypto.subtle.exportKey("raw", sk));
+
+    let text = JSON.stringify(
       {
         ek: bufferToBase64(
           await crypto.subtle.exportKey("raw", ephemeralKey.publicKey)
@@ -161,15 +164,26 @@ async function aliceDHCalculations(e: Event) {
         d2: bufferToBase64(await crypto.subtle.exportKey("raw", dh2)),
         d3: bufferToBase64(await crypto.subtle.exportKey("raw", dh3)),
         d4: bufferToBase64(await crypto.subtle.exportKey("raw", dh4)),
-        sk: bufferToBase64(await crypto.subtle.exportKey("raw", sk)),
+        sk: skString,
       },
       null,
       2
     );
+
+    text = text.replace(
+      skString,
+      `<span class="text-emphasis-red">${skString}</span>`
+    );
+
+    el.innerHTML = text;
   }
 }
 
 async function aliceEncryptMessage(e: Event) {
+  if (!aliceSymmetricKey) {
+    await aliceDHCalculations(e);
+  }
+
   const message =
     (document.getElementById("alice-message") as HTMLTextAreaElement).value ??
     "";
@@ -224,11 +238,22 @@ async function aliceEncryptMessage(e: Event) {
 
   const el = document.getElementById("alice-ciphertext");
   if (el) {
-    el.innerText = JSON.stringify(aliceMessage, null, 2);
+    let text = JSON.stringify(aliceMessage, null, 2);
+
+    text = text.replace(
+      aliceMessage.message,
+      `<span class="text-emphasis-green">${aliceMessage.message}</span>`
+    );
+
+    el.innerHTML = text;
   }
 }
 
 async function bobDHCalculations(e: Event) {
+  if (!aliceMessage) {
+    await aliceEncryptMessage(e);
+  }
+
   const prekeyMessage = aliceMessage;
   const bob = identities["bob"];
 
@@ -297,18 +322,26 @@ async function bobDHCalculations(e: Event) {
 
   const el = document.getElementById("bob-generate-sk");
   if (el) {
-    el.innerText = JSON.stringify(
+    const skString = bufferToBase64(await crypto.subtle.exportKey("raw", sk));
+    let text = JSON.stringify(
       {
         ek: bufferToBase64(await crypto.subtle.exportKey("raw", ephemeralKey)),
         d1: bufferToBase64(await crypto.subtle.exportKey("raw", dh1)),
         d2: bufferToBase64(await crypto.subtle.exportKey("raw", dh2)),
         d3: bufferToBase64(await crypto.subtle.exportKey("raw", dh3)),
         d4: bufferToBase64(await crypto.subtle.exportKey("raw", dh4)),
-        sk: bufferToBase64(await crypto.subtle.exportKey("raw", sk)),
+        sk: skString,
       },
       null,
       2
     );
+
+    text = text.replace(
+      skString,
+      `<span class="text-emphasis-red">${skString}</span>`
+    );
+
+    el.innerHTML = text;
   }
 }
 
@@ -326,13 +359,28 @@ async function bobDecrypt(e: Event): Promise<void> {
     base64ToBuffer(aliceMessage?.message as string)
   );
 
+  const parsedMessage = JSON.parse(
+    new TextDecoder().decode(decrypted).toString()
+  );
+
+  parsedMessage.authenticated =
+    parsedMessage.ad ===
+    `${aliceMessage?.identityKey}|${bufferToBase64(
+      await crypto.subtle.exportKey(
+        "raw",
+        identities["bob"].identitySigningKey.publicKey
+      )
+    )}`;
+
   const el = document.getElementById("bob-plaintext");
   if (el) {
-    el.innerText = JSON.stringify(
-      JSON.parse(new TextDecoder().decode(decrypted).toString()),
-      null,
-      2
+    let text = JSON.stringify(parsedMessage, null, 2);
+    text = text.replace(
+      parsedMessage.msg,
+      `<span class="text-emphasis-green">${parsedMessage.msg}</span>`
     );
+
+    el.innerHTML = text;
   }
 }
 
@@ -468,11 +516,8 @@ async function createIdentityKeys(): Promise<FullIdentity> {
 
 async function sharePrekeyBundle(name: string, bundle: FullIdentity) {
   let shareable = {
-    identitySigningKey: bufferToBase64(
+    identityKey: bufferToBase64(
       await crypto.subtle.exportKey("raw", bundle.identitySigningKey.publicKey)
-    ),
-    identityDHKey: bufferToBase64(
-      await crypto.subtle.exportKey("raw", bundle.identityDHKey.publicKey)
     ),
     signedPreKey: bufferToBase64(
       await crypto.subtle.exportKey("raw", bundle.signedPreKey.publicKey)

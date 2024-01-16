@@ -2,50 +2,73 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  h1 {
-    @apply text-3xl;
-    @apply mb-16;
-  }
+h1 {
+  @apply text-3xl;
+  @apply mb-16;
+}
 
-  h2 {
-    @apply text-2xl;
-    @apply mb-8;
-  }
+h2 {
+  @apply text-2xl;
+  @apply mb-8;
+}
 
-  a[href] {
-    @apply text-blue-500;
-    @apply underline;
-  }
+a[href] {
+  @apply text-blue-500;
+  @apply underline;
+}
 
-  p {
-    @apply mb-8;
-  }
+p {
+  @apply mb-8;
+}
 
-  ol {
-    @apply list-decimal;
-    @apply mb-8;
-    @apply ml-4;
-  }
+code {
+  @apply text-sm;
+  @apply p-1;
+  @apply rounded;
+  @apply text-pink-500;
+  @apply bg-gray-100;
+  @apply dark:bg-gray-900;
+}
 
-  ol li + li {
-    @apply mt-2;
-  }
+ol {
+  @apply list-decimal;
+  @apply mb-8;
+  @apply ml-4;
+}
 
-  pre {
-    @apply p-2;
-    @apply bg-gray-100;
-    @apply dark:bg-gray-900;
-    @apply overflow-auto;
-    @apply max-h-64;
-    @apply rounded;
-  }
+ol li + li {
+  @apply mt-2;
+}
 
-  button {
-    @apply bg-violet-600;
-    @apply text-white;
-    @apply py-2;
-    @apply px-4;
-    @apply rounded;
-  }
+pre {
+  @apply p-2;
+  @apply bg-gray-100;
+  @apply dark:bg-gray-900;
+  @apply overflow-auto;
+  @apply max-h-64;
+  @apply rounded;
+}
+
+pre > code {
+  @apply text-black;
+  @apply dark:text-white;
+  @apply p-0;
+}
+
+button {
+  @apply bg-violet-600;
+  @apply text-white;
+  @apply py-2;
+  @apply px-4;
+  @apply rounded;
+}
+
+.text-emphasis-green {
+  @apply text-green-500;
+  @apply dark:text-green-400;
+}
+
+.text-emphasis-red {
+  @apply text-red-500;
+  @apply dark:text-red-400;
 }

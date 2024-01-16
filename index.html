@@ -4,16 +4,46 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="dist/css/main.css" />
-    <title>WebCrypto Signal Protocol</title>
+    <title>WebCrypto Signal Protocol: X3DH Key Exchange</title>
   </head>
   <body class="dark:bg-gray-950 dark:text-white">
-    <h1 class="text-center">WebCrypto Signal Protocol</h1>
+    <h1 class="text-center mt-16">
+      WebCrypto Signal Protocol
+      <div class="text-lg">X3DH Key Exchange</div>
+      <div class="text-sm">
+        by <a href="https://keithbartholomew.com/">Keith Bartholomew</a>
+      </div>
+    </h1>
 
-    <div class="grid grid-cols-2 gap-2 px-2 mb-16">
+    <div class="text-left mx-auto max-w-prose px-4 md:px-0 mb-16">
+      <p>
+        This demo shows a rough implementation of the
+        <a href="https://signal.org/" target="_blank">Signal Protocol's</a>
+        <a
+          href="https://www.signal.org/docs/specifications/x3dh/"
+          target="_blank"
+          >X3DH key exchange algorithm</a
+        >
+        using only the
+        <a
+          href="https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto"
+          target="_blank"
+          >WebCrypto APIs</a
+        >
+        that are native to modern web browsers.
+        <em
+          >This is not intended to be a secure X3DH implementation and is for
+          demonstration purposes only.</em
+        >
+      </p>
+    </div>
+
+    <div class="hidden md:grid grid-cols-1 md:grid-cols-2 gap-2 px-4 mb-16">
       <div><h2 class="text-center">Alice</h2></div>
       <div><h2 class="text-center">Bob</h2></div>
     </div>
-    <div class="text-left mx-auto max-w-prose mb-16">
+
+    <div class="text-left mx-auto max-w-prose px-4 md:px-0 mb-16">
       <p>
         Alice and Bob each begin by creating a "prekey bundle", which contains
         their long-term identity key, a signed prekey, and a set of one-time-use
@@ -21,21 +51,25 @@
         server and with other users.
       </p>
     </div>
-    <div class="grid grid-cols-2 gap-2 px-2 mb-16">
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-2 px-4 mb-16">
       <div>
+        <h2 class="text-center md:hidden">Alice</h2>
         <pre><code id="alice-prekey-bundle"></code></pre>
       </div>
       <div>
+        <h2 class="text-center md:hidden">Bob</h2>
         <pre><code id="bob-prekey-bundle"></code></pre>
       </div>
     </div>
-    <div class="text-left mx-auto max-w-prose mb-16">
+    <div class="text-left mx-auto max-w-prose px-4 md:px-0 mb-16">
+      <h2 class="text-center md:hidden">Alice</h2>
       When Alice wants to send a message to Bob, she finds him on the server and
       downloads part of his prekey bundle. (She only downloads a single
       one-time-use prekey) Her first step is to verify the signature of Bob's
       signed prekey, to prove that it was signed by Bob's identity key.
     </div>
-    <div class="grid grid-cols-2 gap-2 px-2 mb-16">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 px-4 mb-16">
       <div>
         <div class="flex flex-col gap-2">
           <div>
@@ -59,7 +93,7 @@
       </div>
       <div></div>
     </div>
-    <div class="text-left mx-auto max-w-prose mb-16">
+    <div class="text-left mx-auto max-w-prose px-4 md:px-0 mb-16">
       <p>
         Now that Alice has proven that Bob signed the signed prekey with his
         private identity key, she can safely begin the key exchange process
@@ -114,7 +148,7 @@
         </li>
       </ol>
     </div>
-    <div class="grid grid-cols-2 gap-2 px-2 mb-16">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 px-4 mb-16">
       <div class="flex flex-col gap-2">
         <div>
           <button onclick="actions.aliceDHCalculations()">
@@ -127,7 +161,7 @@
       </div>
       <div></div>
     </div>
-    <div class="text-left mx-auto max-w-prose mb-16">
+    <div class="text-left mx-auto max-w-prose px-4 md:px-0 mb-16">
       <p>
         Alice can now encrypt her initial message and send it to Bob, along with
         her identity key, her ephemeral key, one of Bob's one-time prekeys, and
@@ -140,7 +174,7 @@
         header containing both Alice's identity key and Bob's identity key.
       </p>
     </div>
-    <div class="grid grid-cols-2 gap-2 px-2 mb-16">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 px-4 mb-16">
       <div class="flex flex-col gap-2">
         <div>
           <textarea
@@ -148,6 +182,7 @@
             name="alice-message"
             id="alice-message"
             rows="3"
+            placeholder="Type a message..."
           ></textarea>
         </div>
         <div>
@@ -162,7 +197,8 @@
       <div></div>
     </div>
 
-    <div class="text-left mx-auto max-w-prose mb-16">
+    <div class="text-left mx-auto max-w-prose px-4 md:px-0 mb-16">
+      <h2 class="text-center md:hidden">Bob</h2>
       <p>
         Bob receives this message, and now begins the process of decrypting it
         to see its contents. (Presumably, he could also look up the profile
@@ -177,7 +213,7 @@
       </p>
     </div>
 
-    <div class="grid grid-cols-2 gap-2 px-2 mb-16">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 px-4 mb-16">
       <div></div>
       <div>
         <div class="flex flex-col gap-2">
@@ -193,18 +229,25 @@
       </div>
     </div>
 
-    <div class="text-left mx-auto max-w-prose mb-16">
+    <div class="text-left mx-auto max-w-prose px-4 md:px-0 mb-16">
       <p>
         If you scroll back up to where Alice calculated her X3DH keys, you’ll
-        notice that all of the calculated Diffie-Hellman keys and the symmetric
-        key that Bob just calculated are identical to the ones that Alice
-        calculated before. This despite Alice not having access to any of Bob's
-        private keys, and despite Bob not having access to any of Alice's
-        private keys. That's the magic of key exchange!
+        notice that all of Bob’s calculated Diffie-Hellman keys and symmetric
+        key are identical to the ones that Alice calculated before. This is
+        despite Alice not having access to any of Bob's private keys, and
+        despite Bob not having access to any of Alice's private keys. That's the
+        magic of key exchange!
+      </p>
+      <p>
+        Bob now uses his calculated symmetric key to decrypt Alice's message.
+        The message includes an <code>ad</code> property with Alice and Bob's
+        identity keys concatenated with a <code>|</code> symbol. Bob validates
+        that this string matches Alice and Bob's identity keys in order to
+        authenticate the message.
       </p>
     </div>
 
-    <div class="grid grid-cols-2 gap-2 px-2 mb-16">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 px-4 mb-16">
       <div></div>
       <div>
         <div class="flex flex-col gap-2">
@@ -218,6 +261,29 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <div class="text-left mx-auto max-w-prose px-4 md:px-0 mb-16">
+      <h2 class="text-center">What’s Next?</h2>
+      <p>
+        All of the work above only served to <em>begin</em> a session between
+        Alice and Bob. It authenticated them with each other and provided a
+        random initial key for their future conversations.
+      </p>
+      <p>
+        However, the symmetric key generated in this example will
+        <strong>never be used again!</strong> Instead, Alice and Bob will each
+        feed that key into the
+        <a
+          href="https://www.signal.org/docs/specifications/doubleratchet/"
+          target="_blank"
+          >Double Ratchet Algorithm</a
+        >
+        to generate new encryption keys for each message they send going
+        forward. This will ensure that even if an attacker breaks the key for
+        one of their messages, that attacker won’t have access to any of their
+        other messages, either before or after the broken message.
+      </p>
     </div>
 
     <script type="module" src="dist/js/main.js"></script>
