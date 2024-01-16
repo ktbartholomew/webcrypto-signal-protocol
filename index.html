@@ -3,103 +3,223 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="/dist/css/main.css" />
+    <link rel="stylesheet" href="dist/css/main.css" />
     <title>WebCrypto Signal Protocol</title>
   </head>
   <body class="dark:bg-gray-950 dark:text-white">
-    <h1 class="text-3xl text-center mb-16">WebCrypto Signal Protocol</h1>
+    <h1 class="text-center">WebCrypto Signal Protocol</h1>
 
     <div class="grid grid-cols-2 gap-2 px-2 mb-16">
-      <div><h2 class="text-2xl text-center">Alice</h2></div>
-      <div><h2 class="text-2xl text-center">Bob</h2></div>
+      <div><h2 class="text-center">Alice</h2></div>
+      <div><h2 class="text-center">Bob</h2></div>
     </div>
     <div class="text-left mx-auto max-w-prose mb-16">
-      Alice and Bob each begin by creating a "prekey bundle", which contains
-      their long-term identity key, a signed prekey, and a set of one-time-use
-      prekeys. The public halves of each of these keys are shared with the
-      server and with other users.
+      <p>
+        Alice and Bob each begin by creating a "prekey bundle", which contains
+        their long-term identity key, a signed prekey, and a set of one-time-use
+        prekeys. The public halves of each of these keys are shared with the
+        server and with other users.
+      </p>
     </div>
     <div class="grid grid-cols-2 gap-2 px-2 mb-16">
       <div>
-        <pre
-          class="bg-gray-100 dark:bg-gray-900 overflow-auto max-h-64 rounded"
-        ><code id="alice-prekey-bundle"></code></pre>
+        <pre><code id="alice-prekey-bundle"></code></pre>
       </div>
       <div>
-        <pre
-          class="bg-gray-100 dark:bg-gray-900 overflow-auto max-h-64 rounded"
-        ><code id="bob-prekey-bundle"></code></pre>
+        <pre><code id="bob-prekey-bundle"></code></pre>
       </div>
     </div>
     <div class="text-left mx-auto max-w-prose mb-16">
       When Alice wants to send a message to Bob, she finds him on the server and
       downloads part of his prekey bundle. (She only downloads a single
-      one-time-use prekey) Her first step is to validate the signature of Bob's
+      one-time-use prekey) Her first step is to verify the signature of Bob's
       signed prekey, to prove that it was signed by Bob's identity key.
     </div>
     <div class="grid grid-cols-2 gap-2 px-2 mb-16">
       <div>
         <div class="flex flex-col gap-2">
           <div>
-            <button
-              class="bg-violet-600 text-white py-2 px-4 rounded"
-              onclick="actions.aliceFetchBob()"
-            >
+            <button onclick="actions.aliceFetchBob()">
               1. Fetch Bob's prekey bundle
             </button>
             <span id="status-fetch-bob-prekey"></span>
           </div>
           <div>
-            <pre
-              class="bg-gray-100 dark:bg-gray-900 overflow-auto max-h-64 rounded"
-            ><code id="fetch-bob-prekey-bundle"></code></pre>
+            <pre><code id="fetch-bob-prekey-bundle"></code></pre>
           </div>
           <div>
-            <button
-              class="bg-violet-600 text-white py-2 px-4 rounded"
-              onclick="actions.aliceValidateBob()"
-            >
-              2. Validate Bob's signed prekey
+            <button onclick="actions.aliceValidateBob()">
+              2. Verify Bob's signed prekey
             </button>
-            <span id="status-validate-bob-prekey"></span>
           </div>
           <div>
-            <pre
-              class="bg-gray-100 dark:bg-gray-900 overflow-auto max-h-64 rounded"
-            ><code id="validate-bob-prekey-bundle"></code></pre>
+            <pre><code id="verify-bob-prekey-bundle"></code></pre>
           </div>
         </div>
       </div>
       <div></div>
     </div>
     <div class="text-left mx-auto max-w-prose mb-16">
-      Now that Alice has proven that Bob signed the signed prekey with his
-      private identity key, she can safely begin the key exchange process using
-      <a
-        href="https://www.signal.org/docs/specifications/x3dh/#sending-the-initial-message"
-        target="_blank"
-        >X3DH</a
-      >
+      <p>
+        Now that Alice has proven that Bob signed the signed prekey with his
+        private identity key, she can safely begin the key exchange process
+        using
+        <a
+          href="https://www.signal.org/docs/specifications/x3dh/#sending-the-initial-message"
+          target="_blank"
+          >X3DH</a
+        >:
+      </p>
+      <ol>
+        <li>
+          <code>ek</code>: Alice generates an ephemeral ECDH key which will only
+          be used for this session. This acts kind of like an initialization
+          vector, ensuring that several of the operations in the key exchange
+          will have unpredictable outputs. (<code>&lt;aliceEphemeral&gt;</code>)
+        </li>
+        <li>
+          <code>d1</code>: Alice derives a shared Diffie-Hellman key using her
+          private identity key and Bob's public signed prekey (<code
+            >DH(&lt;aliceIdentity&gt;, &lt;bobSignedPrekey&gt;)</code
+          >)
+        </li>
+        <li>
+          <code>d2</code>: Alice derives a shared Diffie-Hellman key using her
+          private ephemeral key and Bob's public identity key (<code
+            >DH(&lt;aliceEphemeral&gt;, &lt;bobIdentity&gt;)</code
+          >)
+        </li>
+        <li>
+          <code>d3</code>: Alice derives a shared Diffie-Hellman key using her
+          private ephemeral key and Bob's public signed prekey. (<code
+            >DH(&lt;aliceEphemeral&gt;, &lt;bobSignedPrekey&gt;)</code
+          >)
+        </li>
+        <li>
+          <code>d4</code>: Alice derives a shared Diffie-Hellman key using her
+          private ephemeral key and Bob's public one-time prekey. (<code
+            >DH(&lt;aliceEphemeral&gt;, &lt;bobOneTimePrekey&gt;)</code
+          >)
+        </li>
+        <li>
+          <code>sk</code>: Alice generates a symmetric encryption key by
+          concatenating all four Diffie-Hellman results and passing them to a
+          Hash-based key derivation function (HKDF). In this example, I'm
+          deviating from the spec slightly and calculating a single HMAC hash of
+          the concatenated Diffie-Hellman keys instead.
+          <strong
+            >This is the symmetric key that will be used to encrypt the first
+            message.</strong
+          >
+        </li>
+      </ol>
     </div>
     <div class="grid grid-cols-2 gap-2 px-2 mb-16">
-      <div>
+      <div class="flex flex-col gap-2">
         <div>
-          <button
-            class="bg-violet-600 text-white py-2 px-4 rounded"
-            onclick="actions.aliceDHCalculations()"
-          >
-            Calculate Diffie-Hellman keys
+          <button onclick="actions.aliceDHCalculations()">
+            3. Calculate X3DH keys
           </button>
         </div>
         <div>
-          <pre
-            class="bg-gray-100 dark:bg-gray-900 overflow-auto max-h-64 rounded"
-          ><code id="alice-generate-sk"></code></pre>
+          <pre><code id="alice-generate-sk"></code></pre>
+        </div>
+      </div>
+      <div></div>
+    </div>
+    <div class="text-left mx-auto max-w-prose mb-16">
+      <p>
+        Alice can now encrypt her initial message and send it to Bob, along with
+        her identity key, her ephemeral key, one of Bob's one-time prekeys, and
+        the ciphertext itself. The ciphertext includes an
+        <a
+          href="https://en.wikipedia.org/wiki/Authenticated_encryption"
+          target="_blank"
+          >“associated data”</a
+        >
+        header containing both Alice's identity key and Bob's identity key.
+      </p>
+    </div>
+    <div class="grid grid-cols-2 gap-2 px-2 mb-16">
+      <div class="flex flex-col gap-2">
+        <div>
+          <textarea
+            class="w-full dark:bg-gray-800 border border-gray-500 rounded p-1"
+            name="alice-message"
+            id="alice-message"
+            rows="3"
+          ></textarea>
+        </div>
+        <div>
+          <button onclick="actions.aliceEncryptMessage()">
+            4. Encrypt Initial Message
+          </button>
+        </div>
+        <div>
+          <pre><code id="alice-ciphertext"></code></pre>
         </div>
       </div>
       <div></div>
     </div>
 
-    <script type="module" src="/dist/js/main.js"></script>
+    <div class="text-left mx-auto max-w-prose mb-16">
+      <p>
+        Bob receives this message, and now begins the process of decrypting it
+        to see its contents. (Presumably, he could also look up the profile
+        identified by Alice's identity key and decide whether he wants to accept
+        the message in the first place)
+      </p>
+      <p>
+        Bob repeats the same set of Diffie-Hellman calculations as Alice, using
+        a combination of the public keys that Alice sent in her message and the
+        private keys of his own. He can then generate the same symmetric key
+        that Alice did, and decrypt her message.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-2 gap-2 px-2 mb-16">
+      <div></div>
+      <div>
+        <div class="flex flex-col gap-2">
+          <div class="text-right">
+            <button onclick="actions.bobDHCalculations()">
+              5. Calculate X3DH keys
+            </button>
+          </div>
+          <div>
+            <pre><code id="bob-generate-sk"></code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="text-left mx-auto max-w-prose mb-16">
+      <p>
+        If you scroll back up to where Alice calculated her X3DH keys, you’ll
+        notice that all of the calculated Diffie-Hellman keys and the symmetric
+        key that Bob just calculated are identical to the ones that Alice
+        calculated before. This despite Alice not having access to any of Bob's
+        private keys, and despite Bob not having access to any of Alice's
+        private keys. That's the magic of key exchange!
+      </p>
+    </div>
+
+    <div class="grid grid-cols-2 gap-2 px-2 mb-16">
+      <div></div>
+      <div>
+        <div class="flex flex-col gap-2">
+          <div class="text-right">
+            <button onclick="actions.bobDecrypt()">
+              6. Decrypt Alice’s message
+            </button>
+          </div>
+          <div>
+            <pre><code id="bob-plaintext"></code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="dist/js/main.js"></script>
   </body>
 </html>

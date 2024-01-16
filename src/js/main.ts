@@ -16,147 +16,334 @@ declare type PrekeyBundle = {
   oneTimePrekey?: CryptoKey;
 };
 
-interface Window {
-  actions: any;
-}
+declare type PrekeyMessage = {
+  identityKey: string;
+  ephemeralKey: string;
+  preKey: string;
+  iv: string;
+  message: string;
+};
 
+/**
+ * These are all global-to-this-module variables to easily share
+ * the outputs of some of the crypto operations.
+ */
 const identities: { [key: string]: FullIdentity } = {};
 
 let bobPrekeyBundle: PrekeyBundle | undefined;
 
+let aliceEphemeralKey: CryptoKeyPair | undefined;
+
+let aliceSymmetricKey: CryptoKey | undefined;
+
+let aliceMessage: PrekeyMessage | undefined;
+
+let bobSymmetricKey: CryptoKey | undefined;
+
+async function aliceFetchBob(e: Event) {
+  bobPrekeyBundle = getPrekeyBundle("bob");
+
+  const el = document.getElementById("fetch-bob-prekey-bundle");
+  if (el) {
+    el.innerHTML = JSON.stringify(
+      {
+        identitySigningKey: bufferToBase64(
+          await crypto.subtle.exportKey(
+            "raw",
+            bobPrekeyBundle.identitySigningKey
+          )
+        ),
+        identityDHKey: bufferToBase64(
+          await crypto.subtle.exportKey("raw", bobPrekeyBundle.identityDHKey)
+        ),
+        signedPrekey: bufferToBase64(
+          await crypto.subtle.exportKey("raw", bobPrekeyBundle.signedPrekey)
+        ),
+        prekeySignature: bobPrekeyBundle.prekeySignature,
+        oneTimePrekey: bufferToBase64(
+          await crypto.subtle.exportKey(
+            "raw",
+            bobPrekeyBundle.oneTimePrekey as CryptoKey
+          )
+        ),
+      },
+      null,
+      2
+    );
+  }
+}
+
+async function aliceValidateBob(e: Event) {
+  if (!bobPrekeyBundle) {
+    return;
+  }
+
+  const verified = await crypto.subtle.verify(
+    { name: "ECDSA", hash: "SHA-256" },
+    bobPrekeyBundle?.identitySigningKey as CryptoKey,
+    base64ToBuffer(bobPrekeyBundle.prekeySignature),
+    await crypto.subtle.exportKey("raw", bobPrekeyBundle.signedPrekey)
+  );
+
+  const el = document.getElementById("verify-bob-prekey-bundle");
+  if (el) {
+    el.innerHTML = JSON.stringify({ verified });
+  }
+}
+
+async function aliceDHCalculations(e: Event) {
+  const alice = identities["alice"];
+  const bob = bobPrekeyBundle;
+
+  const ephemeralKey = await crypto.subtle.generateKey(
+    {
+      name: "ECDH",
+      namedCurve: CURVE,
+    },
+    true,
+    ["deriveKey"]
+  );
+
+  const dh1 = await crypto.subtle.deriveKey(
+    { name: "ECDH", public: bob?.signedPrekey },
+    alice.identityDHKey.privateKey,
+    { name: "AES-GCM", length: 256 },
+    true,
+    ["encrypt", "decrypt"]
+  );
+
+  const dh2 = await crypto.subtle.deriveKey(
+    {
+      name: "ECDH",
+      public: bob?.identityDHKey,
+    },
+    ephemeralKey.privateKey,
+    { name: "AES-GCM", length: 256 },
+    true,
+    ["encrypt", "decrypt"]
+  );
+
+  const dh3 = await crypto.subtle.deriveKey(
+    {
+      name: "ECDH",
+      public: bob?.signedPrekey,
+    },
+    ephemeralKey.privateKey,
+    { name: "AES-GCM", length: 256 },
+    true,
+    ["encrypt", "decrypt"]
+  );
+
+  const dh4 = await crypto.subtle.deriveKey(
+    {
+      name: "ECDH",
+      public: bob?.oneTimePrekey,
+    },
+    ephemeralKey.privateKey,
+    { name: "AES-GCM", length: 256 },
+    true,
+    ["encrypt", "decrypt"]
+  );
+
+  const sk = await createX3DHKey(dh1, dh2, dh3, dh4);
+
+  aliceEphemeralKey = ephemeralKey;
+  aliceSymmetricKey = sk;
+
+  const el = document.getElementById("alice-generate-sk");
+  if (el) {
+    el.innerHTML = JSON.stringify(
+      {
+        ek: bufferToBase64(
+          await crypto.subtle.exportKey("raw", ephemeralKey.publicKey)
+        ),
+        d1: bufferToBase64(await crypto.subtle.exportKey("raw", dh1)),
+        d2: bufferToBase64(await crypto.subtle.exportKey("raw", dh2)),
+        d3: bufferToBase64(await crypto.subtle.exportKey("raw", dh3)),
+        d4: bufferToBase64(await crypto.subtle.exportKey("raw", dh4)),
+        sk: bufferToBase64(await crypto.subtle.exportKey("raw", sk)),
+      },
+      null,
+      2
+    );
+  }
+}
+
+async function aliceEncryptMessage(e: Event) {
+  const message =
+    (document.getElementById("alice-message") as HTMLTextAreaElement).value ??
+    "";
+
+  const aliceIdString = bufferToBase64(
+    await crypto.subtle.exportKey(
+      "raw",
+      identities["alice"].identitySigningKey.publicKey
+    )
+  );
+  const bobIdString = bufferToBase64(
+    await crypto.subtle.exportKey(
+      "raw",
+      bobPrekeyBundle?.identitySigningKey as CryptoKey
+    )
+  );
+
+  const messageWithHeader = JSON.stringify({
+    ad: `${aliceIdString}|${bobIdString}`,
+    msg: message,
+  });
+
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    aliceSymmetricKey as CryptoKey,
+    new TextEncoder().encode(messageWithHeader as string)
+  );
+
+  aliceMessage = {
+    identityKey: bufferToBase64(
+      await crypto.subtle.exportKey(
+        "raw",
+        identities["alice"].identitySigningKey.publicKey
+      )
+    ),
+    ephemeralKey: bufferToBase64(
+      await crypto.subtle.exportKey(
+        "raw",
+        aliceEphemeralKey?.publicKey as CryptoKey
+      )
+    ),
+    preKey: bufferToBase64(
+      await crypto.subtle.exportKey(
+        "raw",
+        bobPrekeyBundle?.oneTimePrekey as CryptoKey
+      )
+    ),
+    iv: bufferToBase64(iv),
+    message: bufferToBase64(encrypted),
+  };
+
+  const el = document.getElementById("alice-ciphertext");
+  if (el) {
+    el.innerText = JSON.stringify(aliceMessage, null, 2);
+  }
+}
+
+async function bobDHCalculations(e: Event) {
+  const prekeyMessage = aliceMessage;
+  const bob = identities["bob"];
+
+  const aliceIdentityKey = await crypto.subtle.importKey(
+    "raw",
+    base64ToBuffer(prekeyMessage?.identityKey as string),
+    { name: "ECDH", namedCurve: CURVE },
+    true,
+    []
+  );
+
+  const ephemeralKey = await crypto.subtle.importKey(
+    "raw",
+    base64ToBuffer(prekeyMessage?.ephemeralKey as string),
+    { name: "ECDH", namedCurve: CURVE },
+    true,
+    []
+  );
+
+  const dh1 = await crypto.subtle.deriveKey(
+    {
+      name: "ECDH",
+      public: aliceIdentityKey,
+    },
+    bob.signedPreKey.privateKey,
+    { name: "AES-GCM", length: 256 },
+    true,
+    ["encrypt", "decrypt"]
+  );
+
+  const dh2 = await crypto.subtle.deriveKey(
+    {
+      name: "ECDH",
+      public: ephemeralKey,
+    },
+    bob.identityDHKey.privateKey,
+    { name: "AES-GCM", length: 256 },
+    true,
+    ["encrypt", "decrypt"]
+  );
+
+  const dh3 = await crypto.subtle.deriveKey(
+    {
+      name: "ECDH",
+      public: ephemeralKey,
+    },
+    bob.signedPreKey.privateKey,
+    { name: "AES-GCM", length: 256 },
+    true,
+    ["encrypt", "decrypt"]
+  );
+
+  const dh4 = await crypto.subtle.deriveKey(
+    {
+      name: "ECDH",
+      public: ephemeralKey,
+    },
+    bob.oneTimePreKeys[0].privateKey,
+    { name: "AES-GCM", length: 256 },
+    true,
+    ["encrypt", "decrypt"]
+  );
+
+  const sk = await createX3DHKey(dh1, dh2, dh3, dh4);
+  bobSymmetricKey = sk;
+
+  const el = document.getElementById("bob-generate-sk");
+  if (el) {
+    el.innerText = JSON.stringify(
+      {
+        ek: bufferToBase64(await crypto.subtle.exportKey("raw", ephemeralKey)),
+        d1: bufferToBase64(await crypto.subtle.exportKey("raw", dh1)),
+        d2: bufferToBase64(await crypto.subtle.exportKey("raw", dh2)),
+        d3: bufferToBase64(await crypto.subtle.exportKey("raw", dh3)),
+        d4: bufferToBase64(await crypto.subtle.exportKey("raw", dh4)),
+        sk: bufferToBase64(await crypto.subtle.exportKey("raw", sk)),
+      },
+      null,
+      2
+    );
+  }
+}
+
+async function bobDecrypt(e: Event): Promise<void> {
+  if (!bobSymmetricKey) {
+    await bobDHCalculations(e);
+  }
+
+  const decrypted = await crypto.subtle.decrypt(
+    {
+      name: "AES-GCM",
+      iv: base64ToBuffer(aliceMessage?.iv as string),
+    },
+    bobSymmetricKey as CryptoKey,
+    base64ToBuffer(aliceMessage?.message as string)
+  );
+
+  const el = document.getElementById("bob-plaintext");
+  if (el) {
+    el.innerText = JSON.stringify(
+      JSON.parse(new TextDecoder().decode(decrypted).toString()),
+      null,
+      2
+    );
+  }
+}
+
 // @ts-ignore
 window.actions = {
-  aliceFetchBob: async (e: Event) => {
-    bobPrekeyBundle = getPrekeyBundle("bob");
-
-    console.log(bobPrekeyBundle);
-
-    const el = document.getElementById("fetch-bob-prekey-bundle");
-    if (el) {
-      el.innerHTML = JSON.stringify(
-        {
-          identitySigningKey: await crypto.subtle.exportKey(
-            "jwk",
-            bobPrekeyBundle.identitySigningKey
-          ),
-          identityDHKey: await crypto.subtle.exportKey(
-            "jwk",
-            bobPrekeyBundle.identityDHKey
-          ),
-          signedPrekey: await crypto.subtle.exportKey(
-            "jwk",
-            bobPrekeyBundle.signedPrekey
-          ),
-          prekeySignature: bobPrekeyBundle.prekeySignature,
-          oneTimePrekey: await crypto.subtle.exportKey(
-            "jwk",
-            bobPrekeyBundle.oneTimePrekey as CryptoKey
-          ),
-        },
-        null,
-        2
-      );
-    }
-  },
-  aliceValidateBob: async (e: Event) => {
-    if (!bobPrekeyBundle) {
-      return;
-    }
-
-    const data = new TextEncoder().encode(
-      JSON.stringify(
-        await crypto.subtle.exportKey("jwk", bobPrekeyBundle.signedPrekey)
-      )
-    );
-
-    const verified = await crypto.subtle.verify(
-      { name: "ECDSA", hash: "SHA-256" },
-      bobPrekeyBundle?.identitySigningKey as CryptoKey,
-      base64ToBuffer(bobPrekeyBundle.prekeySignature),
-      data
-    );
-
-    const el = document.getElementById("validate-bob-prekey-bundle");
-    if (el) {
-      el.innerHTML = JSON.stringify({ verified });
-    }
-  },
-  aliceDHCalculations: async (e: Event) => {
-    const alice = identities["alice"];
-    const bob = bobPrekeyBundle;
-
-    const ephemeralKey = await crypto.subtle.generateKey(
-      {
-        name: "ECDH",
-        namedCurve: CURVE,
-      },
-      true,
-      ["deriveKey"]
-    );
-
-    const dh1 = await crypto.subtle.deriveKey(
-      { name: "ECDH", public: bob?.signedPrekey },
-      alice.identityDHKey.privateKey,
-      { name: "AES-GCM", length: 256 },
-      true,
-      ["encrypt", "decrypt"]
-    );
-
-    const dh2 = await crypto.subtle.deriveKey(
-      {
-        name: "ECDH",
-        public: bob?.identityDHKey,
-      },
-      ephemeralKey.privateKey,
-      { name: "AES-GCM", length: 256 },
-      true,
-      ["encrypt", "decrypt"]
-    );
-
-    const dh3 = await crypto.subtle.deriveKey(
-      {
-        name: "ECDH",
-        public: bob?.signedPrekey,
-      },
-      ephemeralKey.privateKey,
-      { name: "AES-GCM", length: 256 },
-      true,
-      ["encrypt", "decrypt"]
-    );
-
-    const dh4 = await crypto.subtle.deriveKey(
-      {
-        name: "ECDH",
-        public: bob?.oneTimePrekey,
-      },
-      ephemeralKey.privateKey,
-      { name: "AES-GCM", length: 256 },
-      true,
-      ["encrypt", "decrypt"]
-    );
-
-    const dhKeys: string[] = [];
-    dhKeys.push(
-      (await crypto.subtle.exportKey("jwk", dh1)).k ?? "",
-      (await crypto.subtle.exportKey("jwk", dh2)).k ?? "",
-      (await crypto.subtle.exportKey("jwk", dh3)).k ?? "",
-      (await crypto.subtle.exportKey("jwk", dh4)).k ?? ""
-    );
-
-    const el = document.getElementById("alice-generate-sk");
-    if (el) {
-      el.innerHTML = JSON.stringify(
-        {
-          dh1: (await crypto.subtle.exportKey("jwk", dh1)).k ?? "",
-          dh2: (await crypto.subtle.exportKey("jwk", dh2)).k ?? "",
-          dh3: (await crypto.subtle.exportKey("jwk", dh3)).k ?? "",
-          dh4: (await crypto.subtle.exportKey("jwk", dh4)).k ?? "",
-        },
-        null,
-        2
-      );
-    }
-  },
+  aliceFetchBob,
+  aliceValidateBob,
+  aliceDHCalculations,
+  aliceEncryptMessage,
+  bobDHCalculations,
+  bobDecrypt,
 } as { [key: string]: (e: Event) => void };
 
 function base64ToBuffer(base64String: string): ArrayBuffer {
@@ -172,13 +359,34 @@ function base64ToBuffer(base64String: string): ArrayBuffer {
   return buffer;
 }
 
+function bufferToBase64(buffer: ArrayBuffer): string {
+  const uint8Array = new Uint8Array(buffer);
+  const binaryString = String.fromCharCode.apply(null, uint8Array as any);
+  return btoa(binaryString);
+}
+
+function splitStringIntoChunks(
+  inputString: string,
+  chunkSize: number
+): string[] {
+  const result: string[] = [];
+  const length = inputString.length;
+
+  for (let i = 0; i < length; i += chunkSize) {
+    result.push(inputString.slice(i, i + chunkSize));
+  }
+
+  return result;
+}
+
 function getPrekeyBundle(user: string): PrekeyBundle {
   const bundle = {
     identitySigningKey: identities[user].identitySigningKey.publicKey,
     identityDHKey: identities[user].identityDHKey.publicKey,
     signedPrekey: identities[user].signedPreKey.publicKey,
     prekeySignature: identities[user].preKeySignature,
-    oneTimePrekey: identities[user].oneTimePreKeys.shift()?.publicKey,
+    // TODO: register which one time prekey was actually used, using an index or an ID
+    oneTimePrekey: identities[user].oneTimePreKeys[0].publicKey,
   };
 
   return bundle;
@@ -234,18 +442,10 @@ async function createIdentityKeys(): Promise<FullIdentity> {
   const preKeySignature = await crypto.subtle.sign(
     { name: "ECDSA", hash: "SHA-256" },
     identitySigningKey.privateKey,
-    new TextEncoder().encode(
-      JSON.stringify(
-        await crypto.subtle.exportKey("jwk", signedPreKey.publicKey)
-      )
-    )
+    await crypto.subtle.exportKey("raw", signedPreKey.publicKey)
   );
-  // const preKeySignature = new ArrayBuffer(32);
 
-  /**
-   * @type {CryptoKeyPair[]}
-   */
-  const oneTimePreKeys = [];
+  const oneTimePreKeys: CryptoKeyPair[] = [];
 
   for (let i = 0; i < 256; i++) {
     oneTimePreKeys.push(
@@ -261,43 +461,26 @@ async function createIdentityKeys(): Promise<FullIdentity> {
     identitySigningKey: identitySigningKey,
     identityDHKey: identityDHKey,
     signedPreKey,
-    preKeySignature: btoa(
-      // @ts-ignore
-      String.fromCharCode.apply(null, new Uint8Array(preKeySignature))
-    ),
+    preKeySignature: bufferToBase64(preKeySignature),
     oneTimePreKeys,
   };
 }
 
-/**
- * Creates an ECDH keypair using the exact same key material as the provided ECDSA keypair.
- * This is needed because the WebCrypto API will only allow the same key to be used for ECDSA
- * or ECDH, but not both.
- *
- * @param identitySigningKey
- */
-async function createIdentityDHKey(
-  identitySigningKey: CryptoKeyPair
-): Promise<CryptoKeyPair> {}
-
 async function sharePrekeyBundle(name: string, bundle: FullIdentity) {
   let shareable = {
-    identitySigningKey: await crypto.subtle.exportKey(
-      "jwk",
-      bundle.identitySigningKey.publicKey
+    identitySigningKey: bufferToBase64(
+      await crypto.subtle.exportKey("raw", bundle.identitySigningKey.publicKey)
     ),
-    identityDHKey: await crypto.subtle.exportKey(
-      "jwk",
-      bundle.identityDHKey.publicKey
+    identityDHKey: bufferToBase64(
+      await crypto.subtle.exportKey("raw", bundle.identityDHKey.publicKey)
     ),
-    signedPreKey: await crypto.subtle.exportKey(
-      "jwk",
-      bundle.signedPreKey.publicKey
+    signedPreKey: bufferToBase64(
+      await crypto.subtle.exportKey("raw", bundle.signedPreKey.publicKey)
     ),
     preKeySignature: bundle.preKeySignature,
     oneTimePreKeys: await Promise.all(
-      bundle.oneTimePreKeys.map((otpk) =>
-        crypto.subtle.exportKey("jwk", otpk.publicKey)
+      bundle.oneTimePreKeys.map(async (otpk) =>
+        bufferToBase64(await crypto.subtle.exportKey("raw", otpk.publicKey))
       )
     ),
   };
@@ -306,6 +489,53 @@ async function sharePrekeyBundle(name: string, bundle: FullIdentity) {
   if (pkbEl) {
     pkbEl.innerText = JSON.stringify(shareable, null, 2);
   }
+}
+
+async function createX3DHKey(
+  dh1: CryptoKey,
+  dh2: CryptoKey,
+  dh3: CryptoKey,
+  dh4: CryptoKey
+): Promise<CryptoKey> {
+  const hmacKey = await crypto.subtle.importKey(
+    "raw",
+    new ArrayBuffer(32), // a zero-filled array
+    { name: "HMAC", hash: "SHA-256" },
+    true,
+    ["sign", "verify"]
+  );
+
+  const concatenated = new Uint8Array(32 * 4);
+  concatenated.set(
+    new Uint8Array(await crypto.subtle.exportKey("raw", dh1)),
+    32 * 0
+  );
+  concatenated.set(
+    new Uint8Array(await crypto.subtle.exportKey("raw", dh2)),
+    32 * 1
+  );
+  concatenated.set(
+    new Uint8Array(await crypto.subtle.exportKey("raw", dh3)),
+    32 * 2
+  );
+  concatenated.set(
+    new Uint8Array(await crypto.subtle.exportKey("raw", dh4)),
+    32 * 3
+  );
+
+  const hash = await crypto.subtle.sign(
+    { name: "HMAC", hash: "SHA-256" },
+    hmacKey,
+    concatenated
+  );
+
+  return crypto.subtle.importKey(
+    "raw",
+    hash,
+    { name: "AES-GCM", length: 256 },
+    true,
+    ["encrypt", "decrypt"]
+  );
 }
 
 async function main() {
