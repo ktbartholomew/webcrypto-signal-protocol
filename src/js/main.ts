@@ -184,9 +184,14 @@ async function aliceEncryptMessage(e: Event) {
     await aliceDHCalculations(e);
   }
 
-  const message =
+  const messageText =
     (document.getElementById("alice-message") as HTMLTextAreaElement).value ??
     "";
+
+  const message = JSON.stringify({
+    timestamp: new Date().toISOString(),
+    msg: messageText,
+  });
 
   const aliceIdString = bufferToBase64(
     await crypto.subtle.exportKey(
@@ -201,16 +206,17 @@ async function aliceEncryptMessage(e: Event) {
     )
   );
 
-  const messageWithHeader = JSON.stringify({
-    ad: `${aliceIdString}|${bobIdString}`,
-    msg: message,
-  });
-
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encrypted = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
+    {
+      name: "AES-GCM",
+      iv,
+      additionalData: new TextEncoder().encode(
+        `${aliceIdString}|${bobIdString}`
+      ),
+    },
     aliceSymmetricKey as CryptoKey,
-    new TextEncoder().encode(messageWithHeader as string)
+    new TextEncoder().encode(message as string)
   );
 
   aliceMessage = {
@@ -354,6 +360,14 @@ async function bobDecrypt(e: Event): Promise<void> {
     {
       name: "AES-GCM",
       iv: base64ToBuffer(aliceMessage?.iv as string),
+      additionalData: new TextEncoder().encode(
+        `${aliceMessage?.identityKey}|${bufferToBase64(
+          await crypto.subtle.exportKey(
+            "raw",
+            identities["bob"].identitySigningKey.publicKey
+          )
+        )}`
+      ),
     },
     bobSymmetricKey as CryptoKey,
     base64ToBuffer(aliceMessage?.message as string)
@@ -362,15 +376,6 @@ async function bobDecrypt(e: Event): Promise<void> {
   const parsedMessage = JSON.parse(
     new TextDecoder().decode(decrypted).toString()
   );
-
-  parsedMessage.authenticated =
-    parsedMessage.ad ===
-    `${aliceMessage?.identityKey}|${bufferToBase64(
-      await crypto.subtle.exportKey(
-        "raw",
-        identities["bob"].identitySigningKey.publicKey
-      )
-    )}`;
 
   const el = document.getElementById("bob-plaintext");
   if (el) {
@@ -542,14 +547,6 @@ async function createX3DHKey(
   dh3: CryptoKey,
   dh4: CryptoKey
 ): Promise<CryptoKey> {
-  const hmacKey = await crypto.subtle.importKey(
-    "raw",
-    new ArrayBuffer(32), // a zero-filled array
-    { name: "HMAC", hash: "SHA-256" },
-    true,
-    ["sign", "verify"]
-  );
-
   const concatenated = new Uint8Array(32 * 4);
   concatenated.set(
     new Uint8Array(await crypto.subtle.exportKey("raw", dh1)),
@@ -568,15 +565,22 @@ async function createX3DHKey(
     32 * 3
   );
 
-  const hash = await crypto.subtle.sign(
-    { name: "HMAC", hash: "SHA-256" },
-    hmacKey,
-    concatenated
+  const hkdfMaterial = await crypto.subtle.importKey(
+    "raw",
+    concatenated,
+    "HKDF",
+    false,
+    ["deriveKey"]
   );
 
-  return crypto.subtle.importKey(
-    "raw",
-    hash,
+  return await crypto.subtle.deriveKey(
+    {
+      name: "HKDF",
+      salt: new Uint8Array(32),
+      info: new TextEncoder().encode("WhisperMessage"),
+      hash: "SHA-256",
+    },
+    hkdfMaterial,
     { name: "AES-GCM", length: 256 },
     true,
     ["encrypt", "decrypt"]

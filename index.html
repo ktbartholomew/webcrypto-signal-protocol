@@ -136,11 +136,9 @@
           >)
         </li>
         <li>
-          <code>sk</code>: Alice generates a symmetric encryption key by
-          concatenating all four Diffie-Hellman results and passing them to a
-          Hash-based key derivation function (HKDF). In this example, I'm
-          deviating from the spec slightly and calculating a single HMAC hash of
-          the concatenated Diffie-Hellman keys instead.
+          <code>sk</code>: Alice generates an AES-256 symmetric encryption key
+          by concatenating all four Diffie-Hellman results and passing them to a
+          Hash-based key derivation function (HKDF).
           <strong
             >This is the symmetric key that will be used to encrypt the first
             message.</strong
@@ -240,10 +238,9 @@
       </p>
       <p>
         Bob now uses his calculated symmetric key to decrypt Alice's message.
-        The message includes an <code>ad</code> property with Alice and Bob's
-        identity keys concatenated with a <code>|</code> symbol. Bob validates
-        that this string matches Alice and Bob's identity keys in order to
-        authenticate the message.
+        Bob authenticates the message’s encryptino by validating that the
+        “associated data” that Alice used when encrypting the message matches
+        Alice and Bob's identity keys.
       </p>
     </div>
 
